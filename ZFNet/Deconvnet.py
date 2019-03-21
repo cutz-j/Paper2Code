@@ -104,7 +104,7 @@ class DeConvNet:
                 tar.close()
 
                 os.remove(os.path.join('data', filename))
-        return
+#        return
 
                 
     def predict(self, image):
@@ -167,7 +167,7 @@ class DeConvNet:
         '''
         return tf.nn.max_pool_with_argmax(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     
-    def BatchGenerator(self, train_stage=1, batch_size=8, image_size=(224, 224, 3), labels=21):
+    def BatchGenerator(self, train_stage=1, batch_size=32, image_size=(224, 224, 3), labels=21):
         '''
         ## function ##
         배치 생성기
@@ -201,8 +201,7 @@ class DeConvNet:
             
 
     def train(self, steps_per_epoch=1000, epochs=10, batch_size=32):
-        batch_generator = self.BatchGenerator(batch_size=batch_size)
-        self.model.fit_generator(batch_generator, steps_per_epoch=steps_per_epoch, epochs=epochs)
+        self.model.fit_generator(self.BatchGenerator(batch_size=batch_size), steps_per_epoch=steps_per_epoch, epochs=epochs)
 
     def buildConv2DBlock(self, block_input, filters, block, depth):
         for i in range(1, depth + 1):
@@ -216,7 +215,7 @@ class DeConvNet:
             
         return conv2d
         
-    def build(self, use_cpu=False, print_summary=False):
+    def build(self, use_cpu=True, print_summary=False):
         vgg16 = VGG16(weights = "imagenet", include_top=False, input_shape = (224, 224, 3))
         
         if use_cpu:
