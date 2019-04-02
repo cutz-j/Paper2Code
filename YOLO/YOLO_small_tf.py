@@ -244,6 +244,9 @@ class YOLO_TF:
 
 
     def detect_from_file(self, filename):
+        '''
+        KK
+        '''
         if self.disp_console: print ('Detect from ' + filename)
         img = cv2.imread(filename)
         self.detect_from_cvmat(img)
@@ -412,7 +415,7 @@ class YOLO_TF:
 
         self.train_step = tf.train.MomentumOptimizer(learning_rate=lr, momentum=0.9).minimize(self.loss,global_step=global_step)
         self.sess = tf.Session()
-        self.sess.run(tf.global_variables_initializer())
+        self.sess.run(tf.global_variables_initializer()) 
 
     def build_label (self,img_filenames,epoch):
             X_global=[]; Y_global=[]; W_global=[]; H_global=[]; C_global=[]; P_global=[]; obj_global=[]; objI_global=[];
