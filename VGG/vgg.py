@@ -8,8 +8,10 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.preprocessing import image
 from keras.callbacks import LambdaCallback
 
+
 tf.reset_default_graph()
-tf.random.set_random_seed(777)
+tf.set_random_seed(777)
+
 
 origin_dir = "d:/data/dogs-vs-cats/train"
 base_dir = "d:/data/dnc"
@@ -18,7 +20,7 @@ train_dir = os.path.join(base_dir, "train")
 validation_dir = os.path.join(base_dir, 'validation')
 test_dir = os.path.join(base_dir, 'test')
 
-
+ 
 ### VGG: keras building ###
 model = models.Sequential()
 model.add(layers.Conv2D(filters=64, kernel_size=(3, 3), padding='same',
@@ -88,7 +90,7 @@ model.add(layers.Dense(units=1000, activation=activations.relu,
                        kernel_initializer=initializers.RandomNormal(mean=0, stddev=0.01, seed=77))) # FC3
 model.add(layers.Dense(units=1, activation=activations.sigmoid,
                        kernel_initializer=initializers.RandomNormal(mean=0, stddev=0.01, seed=77))) # sigmoid
-model.compile(optimizer=optimizers.SGD(lr=0.01, momentum=0.9, decay=1e-6, nesterov=True),
+model.compile(optimizer=optimizers.SGD(lr=0.01, momentum=0.9, decay=1e-6, nesterov=False),
               loss=losses.binary_crossentropy, metrics=['acc'])
 
 
@@ -97,23 +99,18 @@ test_datagen = ImageDataGenerator(rescale=1./255) # pixel (0, 255) --> (0, 1)
 
 train_generator = train_datagen.flow_from_directory(train_dir,
                                                     target_size=(224, 224),
-                                                    batch_size=32,
+                                                    batch_size=16,
                                                     class_mode='binary')
 
 validation_generator = test_datagen.flow_from_directory(validation_dir,
                                                         target_size=(224, 224),
                                                         batch_size=20,
                                                         class_mode='binary')
-weights_history = []
-
-print_weights = LambdaCallback(on_epoch_end=lambda batch, logs: weights_history.append(model.layers[0].get_weights()))
 
 # 1 epoch 학습 후 w 변화값 & 시각화 #
-history = model.fit_generator(train_generator, steps_per_epoch=1, epochs=1,
-                              validation_data=validation_generator, validation_steps=10,
-                              callbacks=[print_weights])
+history = model.fit_generator(train_generator, steps_per_epoch=64, epochs=70,
+                              validation_data=validation_generator, validation_steps=50)
 
-model.get_weights()[0][:,:,:,0]
 
 img = image.load_img(img_path, target_size=(224,224))
 img_tensor = image.img_to_array(img)
@@ -220,98 +217,76 @@ train = tf.train.MomentumOptimizer(learning_rate=0.01, momentum=0.9, use_nestero
 
 correct = tf.equal(tf.argmax(fc16, 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
+#
+#train_datagen = ImageDataGenerator(rescale=1./255)
+#test_datagen = ImageDataGenerator(rescale=1./255) # pixel (0, 255) --> (0, 1)
+#
+#train_generator = train_datagen.flow_from_directory(train_dir,
+#                                                    target_size=(224, 224),
+#                                                    batch_size=256,
+#                                                    class_mode='binary')
+#
+#validation_generator = test_datagen.flow_from_directory(validation_dir,
+#                                                        target_size=(224, 224),
+#                                                        batch_size=256,
+#                                                        class_mode='binary')
 
-train_datagen = ImageDataGenerator(rescale=1./255)
-test_datagen = ImageDataGenerator(rescale=1./255) # pixel (0, 255) --> (0, 1)
 
-train_generator = train_datagen.flow_from_directory(train_dir,
-                                                    target_size=(224, 224),
-                                                    batch_size=32,
-                                                    class_mode='binary')
-
-validation_generator = test_datagen.flow_from_directory(validation_dir,
-                                                        target_size=(224, 224),
-                                                        batch_size=20,
-                                                        class_mode='binary')
-
-
-sess = tf.Session()
+config = tf.ConfigProto(log_device_placement=True)
+sess = tf.Session(config=config)
 
 sess.run(tf.global_variables_initializer())
 
-saver = tf.train.Saver()
 
-tf.add_to_collection('train_op', train)
-tf.add_to_collection('cost_op', cost)
-tf.add_to_collection('input', X)
-tf.add_to_collection('target', y)
-tf.add_to_collection('pred', fc16)
+#img = image.load_img(img_path, target_size=(224,224))
+#img_tensor = image.img_to_array(img)
+#img_tensor = np.expand_dims(img_tensor, axis=0) # cnn network 3D tensor
+#img_tensor /= 255. # normalization
+#
+#def learnImg():
+#    activations = []
+#    activations.append(sess.run(conv1, feed_dict={X: img_tensor}))
+#    activations.append(sess.run(conv13, feed_dict={X: img_tensor}))
+#    
+#        
+#    images_per_row = 16
+#    
+#    for layer_activation in activations:
+#        n_features = layer_activation.shape[-1] # w filter
+#        
+#        size = layer_activation.shape[1] # size
+#        n_cols = n_features // images_per_row # 팔렛트
+#        display_grid = np.zeros((size * n_cols, images_per_row * size))
+#        
+#        for col in range(n_cols):
+#            for row in range(images_per_row):
+#                channel_image = layer_activation[0, :, :, col*images_per_row+row] # feature map 1개
+#                channel_image -= channel_image.mean()
+#                channel_image /= channel_image.std()
+#                channel_image *= 64
+#                channel_image += 128
+#                channel_image = np.clip(channel_image, 0, 255).astype('uint8')
+#                display_grid[col * size : (col + 1) * size, row * size: (row+1) * size] = channel_image # palette
+#        scale = 1. / size
+#        plt.figure(figsize=(scale * display_grid.shape[1], scale * display_grid.shape[0]))
+#        plt.grid(False)
+#        plt.imshow(display_grid, aspect='auto', cmap='viridis')
+#    plt.show()
 
-img = image.load_img(img_path, target_size=(224,224))
-img_tensor = image.img_to_array(img)
-img_tensor = np.expand_dims(img_tensor, axis=0) # cnn network 3D tensor
-img_tensor /= 255. # normalization
-
-def learnImg():
-    activations = []
-    activations.append(sess.run(conv1, feed_dict={X: img_tensor}))
-    activations.append(sess.run(conv13, feed_dict={X: img_tensor}))
-    
-        
-    images_per_row = 16
-    
-    for layer_activation in activations:
-        n_features = layer_activation.shape[-1] # w filter
-        
-        size = layer_activation.shape[1] # size
-        n_cols = n_features // images_per_row # 팔렛트
-        display_grid = np.zeros((size * n_cols, images_per_row * size))
-        
-        for col in range(n_cols):
-            for row in range(images_per_row):
-                channel_image = layer_activation[0, :, :, col*images_per_row+row] # feature map 1개
-                channel_image -= channel_image.mean()
-                channel_image /= channel_image.std()
-                channel_image *= 64
-                channel_image += 128
-                channel_image = np.clip(channel_image, 0, 255).astype('uint8')
-                display_grid[col * size : (col + 1) * size, row * size: (row+1) * size] = channel_image # palette
-        scale = 1. / size
-        plt.figure(figsize=(scale * display_grid.shape[1], scale * display_grid.shape[0]))
-        plt.grid(False)
-        plt.imshow(display_grid, aspect='auto', cmap='viridis')
-    plt.show()
-
-W1_list = []
-W12_list = []
-
-old_W = {}
-for var in tf.get_default_graph().get_collection('trainable_variables'):
-    if 'W1' in var.name or 'W12' in var.name:
-        old_W[var.name] = sess.run(var)
-
-for epoch in range(1):
-    for i in range(5):
+for epoch in range(140):
+    for i in range(64):
         _, cost_val = sess.run([train, cost], feed_dict={X: train_generator.next()[0], y: train_generator.next()[1].reshape(-1, 1)})
         print(cost_val)
-    saver.save(sess, './model.ckpt', global_step=epoch)
-     
-new_W = {}
-for var in tf.get_default_graph().get_collection('trainable_variables'):
-    if 'W1' in var.name or 'W12' in var.name:
-        new_W[var.name] = sess.run(var)
-        
-        
-tf.get_default_graph().get_tensor_by_name("W1:0").eval(sess)
 
-         
-#learnImg()
+for epoch in range(1):
+    acc = 0
+    for i in range(50):     
+            acc_val, cor, yhat = sess.run([accuracy, correct, fc16], 
+                                              feed_dict={X: validation_generator.next()[0], y: validation_generator.next()[1].reshape(-1, 1)})
+            acc += acc_val
+    acc /= 50
 
-
-
-
-
-
+print(acc)
 
 
 
