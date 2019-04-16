@@ -7,10 +7,12 @@ from keras import layers, models, optimizers, initializers, activations, losses
 from keras.preprocessing.image import ImageDataGenerator
 from keras.preprocessing import image
 from keras.callbacks import LambdaCallback
+from tensorflow.python.client import device_lib
 
+device_lib.list_local_devices()
 
-tf.reset_default_graph()
-tf.set_random_seed(777)
+#tf.reset_default_graph()
+#tf.set_random_seed(777)
 
 
 origin_dir = "d:/data/dogs-vs-cats/train"
@@ -99,7 +101,7 @@ test_datagen = ImageDataGenerator(rescale=1./255) # pixel (0, 255) --> (0, 1)
 
 train_generator = train_datagen.flow_from_directory(train_dir,
                                                     target_size=(224, 224),
-                                                    batch_size=16,
+                                                    batch_size=32,
                                                     class_mode='binary')
 
 validation_generator = test_datagen.flow_from_directory(validation_dir,
@@ -108,7 +110,8 @@ validation_generator = test_datagen.flow_from_directory(validation_dir,
                                                         class_mode='binary')
 
 # 1 epoch 학습 후 w 변화값 & 시각화 #
-history = model.fit_generator(train_generator, steps_per_epoch=64, epochs=70,
+model.summary()
+history = model.fit_generator(train_generator, steps_per_epoch=50, epochs=40,
                               validation_data=validation_generator, validation_steps=50)
 
 
@@ -273,7 +276,7 @@ sess.run(tf.global_variables_initializer())
 #        plt.imshow(display_grid, aspect='auto', cmap='viridis')
 #    plt.show()
 
-for epoch in range(140):
+for epoch in range(40):
     for i in range(64):
         _, cost_val = sess.run([train, cost], feed_dict={X: train_generator.next()[0], y: train_generator.next()[1].reshape(-1, 1)})
         print(cost_val)
