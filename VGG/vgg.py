@@ -101,7 +101,7 @@ test_datagen = ImageDataGenerator(rescale=1./255) # pixel (0, 255) --> (0, 1)
 
 train_generator = train_datagen.flow_from_directory(train_dir,
                                                     target_size=(224, 224),
-                                                    batch_size=32,
+                                                    batch_size=50,
                                                     class_mode='binary')
 
 validation_generator = test_datagen.flow_from_directory(validation_dir,
@@ -111,7 +111,7 @@ validation_generator = test_datagen.flow_from_directory(validation_dir,
 
 # 1 epoch 학습 후 w 변화값 & 시각화 #
 model.summary()
-history = model.fit_generator(train_generator, steps_per_epoch=50, epochs=40,
+history = model.fit_generator(train_generator, steps_per_epoch=40, epochs=30,
                               validation_data=validation_generator, validation_steps=50)
 
 
