@@ -1,10 +1,11 @@
-from keras import layers
+from keras import layers, optimizers, losses
 from keras.datasets import cifar10
 from keras.models import Sequential, Model
-from keras.optimizers import Adam
 from keras.models import load_model
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+from keras.preprocessing.image import ImageDataGenerator
 
 def inception_module(x, o_1=64, r_3=64, o_3=128, r_5=16, o_5=32, pool=32):
     '''
@@ -27,7 +28,7 @@ def inception_module(x, o_1=64, r_3=64, o_3=128, r_5=16, o_5=32, pool=32):
 input_shape = (224, 224, 3)
 
 input_data = layers.Input(shape=input_shape)
-x = layers.Conv2D(units=64, kernel=7, strides=2, padding='same')(input_data)
+x = layers.Conv2D(64, 7, strides=2, padding='same')(input_data)
 x = layers.MaxPool2D(pool_size=(3, 3), strides=2, padding='same')(x)
 x = layers.BatchNormalization()(x)
 x = layers.Conv2D(64, 1, strides=1)(x)
@@ -37,4 +38,51 @@ x = layers.MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
 x = inception_module(x, o_1=64, r_3=96, o_3=128, r_5=16, o_5=32, pool=32)
 x = inception_module(x, o_1=128, r_3=128, o_3=192, r_5=32, o_5=96, pool=64)
 x = layers.MaxPool2D(pool_size=(3, 3), strides=2, padding='same')(x)
-x = layers.
+x = inception_module(x, o_1=192, r_3=96, o_3=208, r_5=16, o_5=48, pool=64)
+x = inception_module(x, o_1=160, r_3=112, o_3=224, r_5=24, o_5=64, pool=64)
+x = inception_module(x, o_1=128, r_3=128, o_3=256, r_5=24, o_5=64, pool=64)
+x = inception_module(x, o_1=112, r_3=144, o_3=288, r_5=32, o_5=64, pool=64)
+x = inception_module(x, o_1=256, r_3=160, o_3=320, r_5=32, o_5=128, pool=128)
+x = layers.MaxPool2D(pool_size=(3, 3), strides=2, padding='same')(x)
+x = inception_module(x, o_1=256, r_3=160, o_3=320, r_5=32, o_5=128, pool=128)
+x = inception_module(x, o_1=384, r_3=192, o_3=384, r_5=48, o_5=128, pool=128)
+x = layers.AvgPool2D(pool_size=(7,7), strides=1)(x)
+x = layers.Dropout(0.4)(x)
+x = layers.Flatten()(x)
+x = layers.Dense(units=1)(x)
+output = layers.Activation('sigmoid')(x)
+net = Model(input_data, output)
+net.compile(optimizer=optimizers.SGD(lr=0.01, momentum=0.9, decay=1e-6, nesterov=False),
+              loss=losses.binary_crossentropy, metrics=['acc'])
+net.summary()
+
+origin_dir = "d:/data/dnc"
+train_dir = os.path.join(origin_dir, "train")
+validation_dir = os.path.join(origin_dir, "validation")
+
+train_datagen = ImageDataGenerator(rescale=1./255)
+test_datagen = ImageDataGenerator(rescale=1./255) # pixel (0, 255) --> (0, 1)
+
+train_generator = train_datagen.flow_from_directory(train_dir,
+                                                    target_size=(224, 224),
+                                                    batch_size=50,
+                                                    class_mode='binary')
+
+validation_generator = test_datagen.flow_from_directory(validation_dir,
+                                                        target_size=(224, 224),
+                                                        batch_size=20,
+                                                        class_mode='binary')
+
+history = net.fit_generator(train_generator, steps_per_epoch=40, epochs=20,
+                              validation_data=validation_generator, validation_steps=50)
+
+
+
+
+
+
+
+
+
+
+
