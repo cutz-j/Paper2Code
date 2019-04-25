@@ -50,7 +50,7 @@ x = layers.AvgPool2D(pool_size=(7,7), strides=1)(x)
 x = layers.Flatten()(x)
 output = layers.Dense(units=196, activation='softmax')(x)
 output = layers.Dropout(0.4)(output)
-net = Model(input_data, output)
+#net = Model(input_data, output)
 net.compile(optimizer=optimizers.adam(lr=0.1),
               loss=losses.categorical_crossentropy, metrics=['acc'])
 net.summary()
