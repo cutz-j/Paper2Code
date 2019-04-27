@@ -17,7 +17,7 @@ validation_dir = os.path.join(origin_dir, "test")
 #                                   rotation_range=20, width_shift_range=0.1,
 #                                   shear_range=0.1, zoom_range=0.1,
 #                                   horizontal_flip=True, fill_mode='nearest')
-train_datagen = ImageDataGenerator(rescale=1./255)
+#train_datagen = ImageDataGenerator(rescale=1./255)
 test_datagen = ImageDataGenerator(rescale=1./255) # pixel (0, 255) --> (0, 1)
 
 train_generator = train_datagen.flow_from_directory(train_dir,
