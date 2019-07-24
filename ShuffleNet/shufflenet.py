@@ -149,13 +149,13 @@ def GroupConv2D(x, in_channels, out_channels, groups=1, kernel=1, strides=1, nam
     for i in range(groups):
         offset = i * channel_by_groups
         # channel divide #
-        groups = Lambda(lambda z: z[:,:,:, offset: offset + channel_by_groups], 
+        group = Lambda(lambda z: z[:,:,:, offset: offset + channel_by_groups], 
                         name='%s/g%d_slice' %(name, i))(x)
         # 각각의 filter channel ( int(0.5 + out_channels / groups)) #
         groups_list.append(Conv2D(int(0.5 + out_channels / groups), 
                                   kernel_size=kernel, apdding='same',
                                   use_bias=False, strides=strides,
-                                  name='%s_/g%d' %(name, i))(x))
+                                  name='%s_/g%d' %(name, i))(group))
     
     return Concatenate(name='%s/concat' % name)(groups_list)
 
