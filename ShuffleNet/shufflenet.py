@@ -4,6 +4,8 @@ from keras.layers import Activation, Conv2D, Add, Concatenate, GlobalAveragePool
 from keras.layers import Input, Dense, MaxPooling2D, AveragePooling2D, BatchNormalization, Lambda
 from keras.layers import DepthwiseConv2D
 from keras.models import Model
+import numpy as np
+
 
 def ShuffleNet(input_shape=None, scale_factor=1.0, include_top=True, weights=None, classes=1000,
                groups=1, num_shuffle_units=[3, 7, 3], bottleneck_ratio=4, **kwargs):
@@ -28,7 +30,7 @@ def ShuffleNet(input_shape=None, scale_factor=1.0, include_top=True, weights=Non
     name = "ShuffleNet_%.2gX_g%d_br_%.2g_%s" % (scale_factor, groups, bottleneck_ratio, "".join([str(x) for x in num_shuffle_units]))
     input_shape = _obtain_input_shape(input_shape, default_size=224, min_size=28, 
                                       require_flatten=include_top,
-                                      data_format=K.image_data.format())
+                                      data_format=K.image_data_format())
     img_input = Input(shape=input_shape)
     # first layer #
     x = Conv2D(filters=24, kernel_size=(3, 3), padding='same', use_bias=False,
@@ -37,7 +39,7 @@ def ShuffleNet(input_shape=None, scale_factor=1.0, include_top=True, weights=Non
     x = Activation('relu')(x)
     x = MaxPooling2D(pool_size=3, strides=2, name="maxpool1")(x)
     
-    channel_list = _info(groups)
+    channel_list = np.asarray(_info(groups), dtype=np.float32)
     channel_list *= scale_factor
     # stage 2 #
     x = shuffle_unit(x, channel_list[0], out_channels=channel_list[1], groups=groups,
@@ -95,8 +97,8 @@ def shuffle_unit(inputs, in_channels, out_channels, groups, bottleneck_ratio, st
     
     bottleneck_channels = int(out_channels * bottleneck_ratio)
     x = GroupConv2D(inputs, in_channels, out_channels=bottleneck_channels,
-                    groups=groups, bname='%s/1x1_gconv_1' % prefix)
-    x = BatchNormalization(x, name='%s/bn_gconv_1' % prefix)(x)
+                    groups=groups, name='%s/1x1_gconv_1' % prefix)
+    x = BatchNormalization(name='%s/bn_gconv_1' % prefix)(x)
     x = Activation('relu', name='%s/relu_gconv_1' % prefix)(x)
     
     x = Lambda(channel_shuffle, arguments={'groups':groups}, name='%s/channel_shuffle' % prefix)(x)
@@ -138,7 +140,7 @@ def GroupConv2D(x, in_channels, out_channels, groups=1, kernel=1, strides=1, nam
         - name
     """
     if groups == 1: # Point-wise Conv
-        return Conv2D(filters=out_channels, kerenel_size=kernel, padding='same',
+        return Conv2D(filters=out_channels, kernel_size=kernel, padding='same',
                       use_bias=False, strdies=strides, name=name)(x)
     
     channel_by_groups = in_channels // groups
@@ -147,13 +149,12 @@ def GroupConv2D(x, in_channels, out_channels, groups=1, kernel=1, strides=1, nam
     assert out_channels % groups == 0
     
     for i in range(groups):
-        offset = i * channel_by_groups
         # channel divide #
-        group = Lambda(lambda z: z[:,:,:, offset: offset + channel_by_groups], 
+        group = Lambda(lambda z: z[:,:,:, int(channel_by_groups * i): int(channel_by_groups * (i + 1))], 
                         name='%s/g%d_slice' %(name, i))(x)
         # 각각의 filter channel ( int(0.5 + out_channels / groups)) #
         groups_list.append(Conv2D(int(0.5 + out_channels / groups), 
-                                  kernel_size=kernel, apdding='same',
+                                  kernel_size=kernel, padding='same',
                                   use_bias=False, strides=strides,
                                   name='%s_/g%d' %(name, i))(group))
     
