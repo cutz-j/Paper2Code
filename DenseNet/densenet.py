@@ -6,7 +6,7 @@ from keras.layers import DepthwiseConv2D, Reshape, Dropout, concatenate
 from keras.models import Model
 from keras.regularizers import l2
 import numpy as np
-import pandas as pd
+#import pandas as pd
 
 
 def DenseNet(input_shape=None, layers_num=121, reduction=0.0, include_top=True, weights=None, classes=1000,
