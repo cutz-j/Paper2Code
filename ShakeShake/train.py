@@ -9,6 +9,7 @@ import random
 import importlib
 
 dataset_dir = 'd:/dataset/'
+outdir = '/logs'
 device = 'cuda:0'
 
 EPOCHS = 1800
@@ -17,6 +18,13 @@ base_lr = 0.2
 weight_decay = 1e-4
 momentum = 0.9
 lr_min = 0
+config = OrderedDict([('input_shape', (1, 3, 32,32)),
+                      ('n_classes', 10),
+                      ('base_channels', 64),
+                      ('depth', 26), 
+                      ('shake_forward', 'shake'), 
+                      ('shake_backward', 'shake'), 
+                      ('shake_image', 'image')])
 
 ## augmentation
 mean = np.array([0.4914, 0.4822, 0.4465])
@@ -33,7 +41,7 @@ train_dataset = datasets.CIFAR10(dataset_dir, train=True, transform=train_transf
 test_dataset = datasets.CIFAR10(dataset_dir, train=False, transform=test_transform, download=True)
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=device, drop_last=True,)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, nm_workers=0, shuffle=False, pin_memory=device, drop_last=False,)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=0, shuffle=False, pin_memory=device, drop_last=False,)
 
 ## train
 global_step = 0
@@ -118,7 +126,7 @@ def test(epoch, model, criterion, test_loader):
             loss_meter.update(loss_, num)
             correct_meter.update(correct_, 1)
     acc = correct_meter.sum / len(test_loader.dataset)
-    print('Epoch {%d} Loss {%.4f} Accuracy {%.4f}'.format(epoch, loss_meter.avg, acc))
+    print('Epoch {} Loss {:.4f} Accuracy {:.4f}'.format(epoch, loss_meter.avg, acc))
     
     test_log = OrderedDict({'epoch':epoch, 
                             'test': OrderedDict({'loss':loss_meter.avg, 'accruacy':acc})})
@@ -129,15 +137,33 @@ torch.manual_seed(7)
 np.random.seed(7)
 random.seed(7)
 
-module = importlib.import_module('shake_shake')
-Network = getattr(module, 'Network')
-Network()
+module = importlib.import_module('shakeshake')
+network = getattr(module, 'Network')
+model = network(config)
+model.to(device)
+n_params = sum([param.view(-1).size()[0] for param in model.parameters()])
 
+criterion = nn.CrossEntropyLoss(reduction='mean')
+steps_per_epoch = len(train_loader)
+optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay, nesterov=True)
+scheduler = get_cosine_annealing_scheduler(optimizer)
 
+test(0, model, criterion, test_loader)
 
-
-
-
+epoch_logs = []
+for epoch in range(1, EPOCHS+1):
+    train_log = train(epoch, model, optimizer, scheduler, criterion, train_loader)
+    test_log = test(epoch, model, criterion, test_loader)
+    epoch_log = train_log.copy()
+    epoch_log.update(test_log)
+    epoch_logs.append(epoch_log)
+    
+    state = OrderedDict([('config', config), ('state_dict', model.state_dict()),
+                         ('optimizer', optimizer.state_dict()), ('epoch', epoch),
+                         ('accuracy', test_log['test']['accuracy'])])
+    
+    model_path = outdir / 'model_state.pth'
+    torch.save(state, model_path)
 
 
 

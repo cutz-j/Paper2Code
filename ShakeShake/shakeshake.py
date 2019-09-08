@@ -10,7 +10,7 @@ class ShakeFunction(Function):
     @staticmethod # instance / class method와 다르게 상속시, 부모클래스 접근
     def forward(ctx, x1, x2, alpha, beta):
         ctx.save_for_backward(x1, x2, alpha, beta)
-        y = x1 * alpha + x2 (1 - alpha)
+        y = x1 * alpha + x2 * (1 - alpha)
         return y
     
     @staticmethod
@@ -94,8 +94,9 @@ class DownsamplingShortcut(nn.Module):
     # Function: downsample residual shortcut
     """
     def __init__(self, in_channels):
+        super(DownsamplingShortcut, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0, bias=False)
-        self.conv2 = nn.Conv2d(in_channels, in_channels, kerenl_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn = nn.BatchNorm2d(in_channels*2)
     
     def forward(self, x):
@@ -126,8 +127,8 @@ class BasicBlock(nn.Module):
             self.shortcut.add_module('downsample', DownsamplingShortcut(in_channels))
     
     def forward(self, x):
-        x1 = self.residual_path1
-        x2 = self.residual_path2
+        x1 = self.residual_path1(x)
+        x2 = self.residual_path2(x)
         
         if self.training:
             shake_config = self.shake_config
@@ -166,7 +167,7 @@ class Network(nn.Module):
         self.stage2 = self._make_stage(n_channels[0], n_channels[1], n_blocks_per_stage, block, stride=2)
         self.stage3 = self._make_stage(n_channels[1], n_channels[2], n_blocks_per_stage, block, stride=2)
         
-        with torch.no_grad:
+        with torch.no_grad():
             self.feature_size = self._forward_conv(torch.zeros(*input_shape)).view(-1).shape[0]
         
         self.fc = nn.Linear(self.feature_size, n_classes)
@@ -182,7 +183,7 @@ class Network(nn.Module):
                 # basic block
                 stage.add_module(block_name, block(in_channels, out_channels, stride=stride, shake_config=self.shake_config))
             else:
-                stage.add_module(block_name, block(out_channels, out_channels, stride-1, shake_config=self.shake_config))
+                stage.add_module(block_name, block(out_channels, out_channels, stride=1, shake_config=self.shake_config))
         return stage
 
     def _forward_conv(self, x):
@@ -197,7 +198,7 @@ class Network(nn.Module):
 
     def forward(self, x):
         x = self._forward_conv(x)
-        x = x.view(x.siae(0), -1)
+        x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x
 
