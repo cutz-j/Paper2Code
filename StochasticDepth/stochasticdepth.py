@@ -1,19 +1,11 @@
-
+from torch import nn, optim
 import numpy as np
+import matplotlib.pyplot as plt
+import torch
 
-def StochasticDepth(input_shape=None, include_top=True, weights=None, classes=1000, **kwargs):
-    '''
-    Stochastic Depth implementation for Pytorch
-    
-    input:
-    - input_shape:
-        image input shape
-    - include_top:
-        final classification layer
-    - expected depth:
-        float, reduce the number of feature-maps at transition layers
-    - weights:
-        pre-trained weight
-    - classes:
-        output classes
-    '''
+def conv3x3(in_planes, out_planes, stride=1):
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
+
+def conv1x1(in_planes, out_planes, stride=1):
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
+
