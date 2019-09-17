@@ -65,7 +65,7 @@ class StochasticDepth(object):
             strides = (2, 2)
             shortcut = AveragePooling2D(pool_size=2, strides=strides)(x)
             if nb_filters > prev_nb_channels:
-                shortcut = Conv2D(prev_nb_channels, kernel_size=(1, 1), strides=1, padding='valid')(x)
+                shortcut = Conv2D(prev_nb_channels, kernel_size=(1, 1), strides=1, padding='valid')(shortcut)
                 shortcut = BatchNormalization()(shortcut)
         else:
             strides = (1, 1)
