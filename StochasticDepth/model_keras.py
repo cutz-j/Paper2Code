@@ -1,8 +1,8 @@
 import numpy as np
 import tensorflow as tf
 from keras.datasets import cifar10
-from keras.layers import Dense, Activation, Flatten, Lambda, Conv2D, AveragePooling2D, BatchNormalization
-from keras.layers import merge, Convolution2D
+from keras.layers import Dense, Activation, Flatten, Lambda, Conv2D, GlobalAveragePooling2D, BatchNormalization, AveragePooling2D
+from keras.layers import Add, Convolution2D
 from keras import Input, Model
 from keras.optimizers import SGD
 from keras.callbacks import Callback, LearningRateScheduler, ModelCheckpoint, EarlyStopping
@@ -37,41 +37,46 @@ class StochasticDepth(object):
         
         for i in range(0, blocks_per_groups):
             nb_filters = 16
-            x = self.res_block(x, nb_filters=nb_filters, block=i, nb_total_blocks=3*blocks_per_groups, subsample_factor=1)
+            x = self.res_block(x, nb_filters=nb_filters, block=i, nb_total_blocks=3*blocks_per_groups, strides=1)
+            
         for i in range(0, blocks_per_groups):
             nb_filters = 32
             if i == 0:
-                subsample_factor = 2
+                strides = 2
             else:
-                subsample_factor = 1
-            x = self.res_block(x, nb_filters=nb_filters, block=blocks_per_groups+i, nb_total_blocks=3*blocks_per_groups, subsample_factor=subsample_factor)
+                strides = 1
+            x = self.res_block(x, nb_filters=nb_filters, block=blocks_per_groups+i, nb_total_blocks=3*blocks_per_groups, strides=strides)
         for i in range(0, blocks_per_groups):
             nb_filters = 64
             if i == 0:
-                subsample_factor = 2
+                strides = 2
             else:
-                subsample_factor = 1
-            x = self.res_block(x, nb_filters=nb_filters, block=2*blocks_per_groups+i, nb_total_blocks=3*blocks_per_groups, subsample_factor=subsample_factor)
-        x = AveragePooling2D(pool_size=(8, 8), strides=None, padding='valid')(x)
-        x = Flatten()(x)
+                strides = 1
+            x = self.res_block(x, nb_filters=nb_filters, block=2*blocks_per_groups+i, nb_total_blocks=3*blocks_per_groups, strides=strides)
+        x = GlobalAveragePooling2D()(x)
         predictions = Dense(self.in_classes, activation='softmax')(x)
         self.model = Model(input=inputs, output=predictions)
         self.model.summary()
                 
     
-    def res_block(self, x, nb_filters, block, nb_total_blocks, subsample_factor):
+    def res_block(self, x, nb_filters, block, nb_total_blocks, strides):
         prev_nb_channels = K.int_shape(x)[-1]
-        if subsample_factor > 1:
-            subsample = (subsample_factor, subsample_factor)
-            shortcut = AveragePooling2D(pool_size=subsample, dim_ordering='tf')(x)
+        if strides > 1:
+            strides = (2, 2)
+            shortcut = AveragePooling2D(pool_size=2, strides=strides)(x)
+            if nb_filters > prev_nb_channels:
+                shortcut = Conv2D(prev_nb_channels, kernel_size=(1, 1), strides=1, padding='valid')(x)
+                shortcut = BatchNormalization()(shortcut)
         else:
-            subsample = (1,1)
+            strides = (1, 1)
             shortcut = x
-        y = Conv2D(nb_filters, kernel_size=(3, 3), strides=1, subsample=subsample, padding='same', kernel_initializer='he_normal')(x)
+        y = Conv2D(nb_filters, kernel_size=(3, 3), strides=strides, padding='same', kernel_initializer='he_normal')(x)
         y = BatchNormalization(axis=-1)(y)
         y = Activation('relu')(y)
-        y = Conv2D(nb_filters, kernel_size=(3, 3), strides=1, subsample=(1,1), kernel_initializer='he_normal', padding='same')(y)
+        y = Conv2D(nb_filters, kernel_size=(3, 3), strides=1, kernel_initializer='he_normal', padding='same')(y)
+        y = BatchNormalization()(y)
         p_survival = get_p_survival(block=block, nb_total_blocks=nb_total_blocks, p_survival_end=0.5, mode='linear_decay')
         y = Lambda(stochastic_survival, arguments={'p_survival':p_survival})(y)
-        out= merge([y, shortcut], mode='sum')
+        out= Add()([y, shortcut])
+        out = Activation('relu')(out)
         return out
