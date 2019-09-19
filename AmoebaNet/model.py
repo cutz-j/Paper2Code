@@ -27,7 +27,7 @@ def separableConv2d(in_planes, out_planes, kernel_size=3, stride=1):
             nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False))
     return x
 
-class AmoebaNet(nn.Module):
+class AmoebaNet_A(nn.Module):
     """
     # Function: AmoebaNet-A for cifar10
     # Arguments:
