@@ -110,8 +110,9 @@ datagen = ImageDataGenerator(featurewise_center=False,
                             validation_split=0.0)
 
 model = ResNet_v2(input_shape=input_shape, depth=depth)
-model.compile(loss='categorical_crossentropy', optmizer=Adam(lr=lr_schedule(0)), )
+model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=lr_schedule(0)), metrics=['acc'])
+model.summary()
 datagen.fit(x_train)
 model.fit_generator(datagen.flow(x_train, y_train, batch_size=batch_size),
                     validation_data=(x_test, y_test),
-                    epochs=epochs, callbacks=callbacks)
+                    epochs=epochs, callbacks=callbacks, verbose=1)
