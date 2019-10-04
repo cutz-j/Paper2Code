@@ -1,0 +1,11 @@
+
+ResNet/data/cifar-10-python.tar.gz
+*.gz
+PyramidNet/data/cifar-10-batches-py/data_batch_5
+PyramidNet/data/cifar-10-batches-py/data_batch_4
+PyramidNet/data/cifar-10-batches-py/data_batch_3
+PyramidNet/data/cifar-10-batches-py/data_batch_2
+PyramidNet/data/cifar-10-batches-py/data_batch_1
+*.meta
+*.pth
+*.pyc
