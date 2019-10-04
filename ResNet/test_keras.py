@@ -1,4 +1,4 @@
-import keras
+#import keras
 from keras.layers import Dense, Conv2D, BatchNormalization, Activation
 from keras.layers import AveragePooling2D, Input, Flatten, GlobalAveragePooling2D
 from keras.optimizers import Adam, SGD, RMSprop
