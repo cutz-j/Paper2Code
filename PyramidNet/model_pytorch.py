@@ -14,6 +14,7 @@
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
+import math
 
 class BottleneckBlock(nn.Module):
     """
@@ -28,15 +29,17 @@ class BottleneckBlock(nn.Module):
     outchannel_ratio = 4
     expansion_ratio = 1
     
-    def __init__(self, in_planes, planes, stride=1):
+    def __init__(self, in_planes, planes, stride=1, downsample=None, reduction=16):
         super(BottleneckBlock, self).__init__()
         self.bn1 = nn.BatchNorm2d(in_planes)
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes*self.expansion_ratio, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(planes*self.expansion_ratio)
-        self.conv3 = nn.Conv2d(planes*self.expansion_ratio, planes*self.outchannel_ratio, kernel_size=1, bias=False)
-        self.bn4 = nn.BatchNorm2d(planes*self.outchannel_ratio)
+        self.conv2 = nn.Conv2d(planes, (planes), kernel_size=3, stride=stride, padding=1, bias=False, groups=1)
+        self.bn3 = nn.BatchNorm2d((planes))
+        self.conv3 = nn.Conv2d((planes), planes*BottleneckBlock.outchannel_ratio, kernel_size=1, bias=False)
+        self.bn4 = nn.BatchNorm2d(planes*BottleneckBlock.outchannel_ratio)
+        self.relu = nn.ReLU(inplace=True)
+        self.downsample = downsample
         self.stride = stride
         
     
@@ -45,18 +48,17 @@ class BottleneckBlock(nn.Module):
         out = self.conv1(out)
         
         out = self.bn2(out)
-        out = F.relu(out)
+        out = self.relu(out)
         out = self.conv2(out)
         
         out = self.bn3(out)
-        out = F.relu(out)
+        out = self.relu(out)
         out = self.conv3(out)
         
         out = self.bn4(out)
         
-        if self.stride != 1:
-            shortcut = nn.AvgPool2d(kernel_size=2, stride=2, ceil_mode=True)
-            shortcut = shortcut(x)
+        if self.downsample is not None:
+            shortcut = self.downsample(x)
             featuremap_size = shortcut.size()[2:4]
         else:
             shortcut = x
@@ -104,8 +106,17 @@ class PyramidNet(nn.Module):
         
         self.final_feature_dim = self.input_feature_dim
         self.bn_final = nn.BatchNorm2d(self.final_feature_dim)
+        self.relu_final = nn.ReLU(inplace=True)
         self.avgpool = nn.AvgPool2d(kernel_size=8)
         self.linear = nn.Linear(self.final_feature_dim, num_classes)
+        
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
     
     def _make_layer(self, block, num_blocks, stride=1):
         """
@@ -115,10 +126,14 @@ class PyramidNet(nn.Module):
             num_blocks: number of inner block
             stride
         """
+        downsample = None
+        if stride != 1:
+            downsample = nn.AvgPool2d(kernel_size=(2, 2), stride=(2, 2), ceil_mode=True)
+        
         layers = []
         # pyramid height increase like pyramid
         self.featuremap_dim = self.featuremap_dim + self.add_rate
-        layers.append(block(self.input_feature_dim, int(round(self.featuremap_dim)), stride))
+        layers.append(block(self.input_feature_dim, int(round(self.featuremap_dim)), stride,downsample))
         for i in range(1, num_blocks):
             temp_featuremap_dim = self.featuremap_dim + self.add_rate
             layers.append(block(int(round(self.featuremap_dim))*block.outchannel_ratio, int(round(temp_featuremap_dim)), 1))
@@ -135,7 +150,7 @@ class PyramidNet(nn.Module):
         out = self.stage3(out)
         
         out = self.bn_final(out)
-        out = F.relu(out)
+        out = self.relu_final(out)
         out = self.avgpool(out)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
