@@ -1,3 +1,12 @@
+# Copyright 
+# https://github.com/lukemelas/EfficientNet-PyTorch/tree/master/efficientnet_pytorch
+# =============================================================================
+#################################################################
+# EfficientNet Group Normalization & Weight Standardization parameters
+# N = 
+# F = 
+###############################################################
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -50,7 +59,7 @@ class MBConvBlock(nn.Module):
         self._depthwise_conv = Conv2d(
             in_channels=oup, out_channels=oup, groups=oup,  # groups makes it depthwise
             kernel_size=k, stride=s, bias=False)
-        self._bn1 = nn.BatchNorm2d(num_features=oup, momentum=self._bn_mom, eps=self._bn_eps)
+#        self._bn1 = nn.BatchNorm2d(num_features=oup, momentum=self._bn_mom, eps=self._bn_eps)
 
         # Squeeze and Excitation layer, if desired
         if self.has_se:
