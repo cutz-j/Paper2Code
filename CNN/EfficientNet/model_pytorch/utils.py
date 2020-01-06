@@ -102,6 +102,7 @@ def get_same_padding_conv2d(image_size=None):
 
 class Conv2dDynamicSamePadding(nn.Conv2d):
     """ 2D Convolutions like TensorFlow, for a dynamic image size """
+    """ Weight Standardization """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1, bias=True):
         super().__init__(in_channels, out_channels, kernel_size, stride, 0, dilation, groups, bias)
@@ -116,7 +117,14 @@ class Conv2dDynamicSamePadding(nn.Conv2d):
         pad_w = max((ow - 1) * self.stride[1] + (kw - 1) * self.dilation[1] + 1 - iw, 0)
         if pad_h > 0 or pad_w > 0:
             x = F.pad(x, [pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2])
-        return F.conv2d(x, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+        
+        # Weight Standardization
+        weight = self.weight
+        weight_mean = weight.mean(dim=1, keepdims=True).mean(dim=2, keepdims=True).mean(dim=3, keepdims=True)
+        weight = weight - weight_mean
+        std = weight.view(weight.size(0), -1).std(dim=1).view(-1, 1, 1, 1) + 1e-5
+        weight = weight / std.expand_as(weight)
+        return F.conv2d(x, weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
 
 
 class Conv2dStaticSamePadding(nn.Conv2d):
@@ -141,7 +149,13 @@ class Conv2dStaticSamePadding(nn.Conv2d):
 
     def forward(self, x):
         x = self.static_padding(x)
-        x = F.conv2d(x, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+        # Weight Standardization
+        weight = self.weight
+        weight_mean = weight.mean(dim=1, keepdims=True).mean(dim=2, keepdims=True).mean(dim=3, keepdims=True)
+        weight = weight - weight_mean
+        std = weight.view(weight.size(0), -1).std(dim=1).view(-1, 1, 1, 1) + 1e-5
+        weight = weight / std.expand_as(weight)
+        x = F.conv2d(x, weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
         return x
 
 
@@ -278,13 +292,13 @@ def efficientnet(width_coefficient=None, depth_coefficient=None, dropout_rate=0.
     return blocks_args, global_params
 
 
-def get_model_params(model_name, override_params):
+def get_model_params(model_name, override_params, num_classes=1000):
     """ Get the block args and global params for a given model """
     if model_name.startswith('efficientnet'):
         w, d, s, p = efficientnet_params(model_name)
         # note: all models have drop connect rate = 0.2
         blocks_args, global_params = efficientnet(
-            width_coefficient=w, depth_coefficient=d, dropout_rate=p, image_size=s)
+            width_coefficient=w, depth_coefficient=d, dropout_rate=p, image_size=s, num_classes=num_classes)
     else:
         raise NotImplementedError('model name is not pre-defined: %s' % model_name)
     if override_params:
@@ -316,3 +330,6 @@ def load_pretrained_weights(model, model_name, load_fc=True):
         res = model.load_state_dict(state_dict, strict=False)
         assert set(res.missing_keys) == set(['_fc.weight', '_fc.bias']), 'issue loading pretrained weights'
     print('Loaded pretrained weights for {}'.format(model_name))
+
+def BatchNorm2d(num_features):
+    return nn.GroupNorm(num_channels=num_features, num_groups=num_features//4)

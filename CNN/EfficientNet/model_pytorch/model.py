@@ -1,5 +1,6 @@
 # Copyright 
 # https://github.com/lukemelas/EfficientNet-PyTorch/tree/master/efficientnet_pytorch
+# https://github.com/joe-siyuan-qiao/WeightStandardization
 # =============================================================================
 #################################################################
 # EfficientNet Group Normalization & Weight Standardization parameters
@@ -21,7 +22,25 @@ from .utils import (
     load_pretrained_weights,
     Swish,
     MemoryEfficientSwish,
+    BatchNorm2d,
 )
+
+class Conv2d_WS(nn.Conv2d):
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=True):
+        super(Conv2d_WS, self).__init__(in_channels, out_channels, kernel_size, stride,
+                 padding, dilation, groups, bias)
+
+    def forward(self, x):
+        weight = self.weight
+        weight_mean = weight.mean(dim=1, keepdim=True).mean(dim=2,
+                                  keepdim=True).mean(dim=3, keepdim=True)
+        weight = weight - weight_mean
+        std = weight.view(weight.size(0), -1).std(dim=1).view(-1, 1, 1, 1) + 1e-5
+        weight = weight / std.expand_as(weight)
+        return F.conv2d(x, weight, self.bias, self.stride,
+                        self.padding, self.dilation, self.groups)
 
 class MBConvBlock(nn.Module):
     """
@@ -51,7 +70,7 @@ class MBConvBlock(nn.Module):
         oup = self._block_args.input_filters * self._block_args.expand_ratio  # number of output channels
         if self._block_args.expand_ratio != 1:
             self._expand_conv = Conv2d(in_channels=inp, out_channels=oup, kernel_size=1, bias=False)
-            self._bn0 = nn.BatchNorm2d(num_features=oup, momentum=self._bn_mom, eps=self._bn_eps)
+            self._bn0 = BatchNorm2d(num_features=oup)
 
         # Depthwise convolution phase
         k = self._block_args.kernel_size
@@ -59,7 +78,7 @@ class MBConvBlock(nn.Module):
         self._depthwise_conv = Conv2d(
             in_channels=oup, out_channels=oup, groups=oup,  # groups makes it depthwise
             kernel_size=k, stride=s, bias=False)
-#        self._bn1 = nn.BatchNorm2d(num_features=oup, momentum=self._bn_mom, eps=self._bn_eps)
+        self._bn1 = BatchNorm2d(num_features=oup)
 
         # Squeeze and Excitation layer, if desired
         if self.has_se:
@@ -70,7 +89,7 @@ class MBConvBlock(nn.Module):
         # Output phase
         final_oup = self._block_args.output_filters
         self._project_conv = Conv2d(in_channels=oup, out_channels=final_oup, kernel_size=1, bias=False)
-        self._bn2 = nn.BatchNorm2d(num_features=final_oup, momentum=self._bn_mom, eps=self._bn_eps)
+        self._bn2 = BatchNorm2d(num_features=final_oup)
         self._swish = MemoryEfficientSwish()
 
     def forward(self, inputs, drop_connect_rate=None):
@@ -138,7 +157,7 @@ class EfficientNet(nn.Module):
         in_channels = 3  # rgb
         out_channels = round_filters(32, self._global_params)  # number of output channels
         self._conv_stem = Conv2d(in_channels, out_channels, kernel_size=3, stride=2, bias=False)
-        self._bn0 = nn.BatchNorm2d(num_features=out_channels, momentum=bn_mom, eps=bn_eps)
+        self._bn0 = BatchNorm2d(num_features=out_channels)
 
         # Build blocks
         self._blocks = nn.ModuleList([])
@@ -209,9 +228,9 @@ class EfficientNet(nn.Module):
         return x
 
     @classmethod
-    def from_name(cls, model_name, override_params=None):
+    def from_name(cls, model_name, override_params=None, num_classes=1000):
         cls._check_model_name_is_valid(model_name)
-        blocks_args, global_params = get_model_params(model_name, override_params)
+        blocks_args, global_params = get_model_params(model_name, override_params, num_classes=num_classes)
         return cls(blocks_args, global_params)
 
     @classmethod
