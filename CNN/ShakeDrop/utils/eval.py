@@ -2,7 +2,7 @@ from __future__ import print_function, absolute_import
 
 __all__ = ['accuracy']
 
-def accuracy(output, target, topk=[1]):
+def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
     maxk = max(topk)
     batch_size = target.size(0)
@@ -13,6 +13,24 @@ def accuracy(output, target, topk=[1]):
 
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        res.append(correct_k.mul_(100.0 / batch_size))
+        correct_k = correct[:k].view(-1).float().sum(0, keepdims=True)
+        wrong_k = batch_size - correct_k
+        res.append(wrong_k.mul_(100.0 / batch_size))
     return res
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
